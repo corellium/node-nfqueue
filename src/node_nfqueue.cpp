@@ -183,12 +183,14 @@ int nfqueue::nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct
   nfqueue* queue = (nfqueue*)data;
   int id = 0;
   struct nfqnl_msg_packet_hdr *ph;
+  struct nfqnl_msg_packet_hw *phw;
   int payload_len;
   unsigned char* payload_data;
   char devname[IFNAMSIZ];
   struct timeval tv;
 
   ph = nfq_get_msg_packet_hdr(nfad);
+  phw = nfq_get_packet_hw(nfad);
   payload_len = nfq_get_payload(nfad, &payload_data);
 
   // get id
@@ -197,6 +199,9 @@ int nfqueue::nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct
 
   // copy payload into a buffer
   Nan::MaybeLocal<Object> buff = Nan::CopyBuffer((const char*)payload_data, payload_len);
+
+  // copy hw address into a buffer
+  Nan::MaybeLocal<Object> hwaddr = Nan::CopyBuffer((const char*)phw->hw_addr, ntohs(phw->hw_addrlen));
 
   Local<Object> p = Nan::New<Object>();
   p->Set(context, Nan::New("len").ToLocalChecked(), Nan::New<Number>(payload_len)).FromJust();
@@ -216,6 +221,7 @@ int nfqueue::nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct
   p->Set(context, Nan::New("outdev_name").ToLocalChecked(), Nan::New<String>(devname).ToLocalChecked()).FromJust();
   nfq_get_physoutdev_name(queue->nlifh, nfad, devname);
   p->Set(context, Nan::New("physoutdev_name").ToLocalChecked(), Nan::New<String>(devname).ToLocalChecked()).FromJust();
+  p->Set(context, Nan::New("hwaddr").ToLocalChecked(), hwaddr.ToLocalChecked()).FromJust();
 
   Local<Value> argv[] = { p, buff.ToLocalChecked() };
 
