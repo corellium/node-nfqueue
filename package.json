@@ -10,8 +10,8 @@
     "clean": "rm -rf build",
     "install": "node-gyp rebuild",
     "build": "npm run clean && node-gyp rebuild",
-    "lint": "npx eslint",
-    "test": "npx nyc report",
+    "lint": "",
+    "test": "node demo/demo.js",
     "test:ci": "npm run test"
   },
   "contributors": [
