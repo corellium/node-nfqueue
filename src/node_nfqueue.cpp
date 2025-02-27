@@ -33,7 +33,7 @@ using namespace v8;
 
 class nfqueue : public Nan::ObjectWrap {
   public:
-    static void Init(Local<Object> exports);
+    static void Init(Local<Object> exports, Local<Value> module, void* priv);
     Nan::Callback callback;
 
   private:
@@ -64,9 +64,9 @@ struct RecvBaton {
 
 Nan::Persistent<Function> nfqueue::constructor;
 
-void nfqueue::Init(Local<Object> exports) {
+void nfqueue::Init(Local<Object> exports, Local<Value> module, void* priv) {
   Nan::HandleScope scope;
-  v8::Local<v8::Context> context = exports->CreationContext();
+  v8::Local<v8::Context> context = exports->GetCreationContext().ToLocalChecked();
 
   // Prepare constructor template
   Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(New);
@@ -256,8 +256,4 @@ NAN_METHOD(nfqueue::Verdict) {
   return;
 }
 
-void initAll(Local<Object> exports) {
-  nfqueue::Init(exports);
-}
-
-NODE_MODULE(nfqueue, initAll)
+NODE_MODULE(nfqueue, nfqueue::Init)
