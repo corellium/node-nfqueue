@@ -6,6 +6,14 @@
     "name": "Anthony Hinsinger",
     "email": "anthony.hinsinger@gmail.com"
   },
+  "scripts": {
+    "clean": "rm -rf build",
+    "install": "node-gyp rebuild",
+    "build": "npm run clean && node-gyp rebuild",
+    "lint": "npx eslint",
+    "test": "npx nyc report",
+    "test:ci": "npm run test"
+  },
   "contributors": [
     {
       "name": "Aleksandr Komlev"
