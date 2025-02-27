@@ -3,6 +3,8 @@ var pcap = require('pcap');
 
 var counter = 0;
 
+console.log('Creating queue handler...');
+
 nfq.createQueueHandler(1, function(nfpacket) {
   console.log('packet received');
   // console.log(JSON.stringify(nfpack, null, 2));
@@ -14,3 +16,14 @@ nfq.createQueueHandler(1, function(nfpacket) {
 
   nfpacket.setVerdict((counter++ % 2) ? nfq.NF_DROP : nfq.NF_ACCEPT);
 });
+
+console.log('Queue handler created!');
+
+if (process.env.TEST_MODE) {
+  console.log('Test mode active, exiting after createQueueHandler');
+  process.exit(0);
+}
+
+
+
+

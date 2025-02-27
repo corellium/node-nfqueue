@@ -11,7 +11,7 @@
     "install": "node-gyp rebuild",
     "build": "npm run clean && node-gyp rebuild",
     "lint": "",
-    "test": "node demo/demo.js",
+    "test": "TEST_MODE=1 node demo/demo.js",
     "test:ci": "npm run test"
   },
   "contributors": [
