@@ -8,8 +8,8 @@
   },
   "scripts": {
     "clean": "rm -rf build",
-    "install": "node-gyp rebuild",
-    "build": "npm run clean && node-gyp rebuild",
+    "install": "",
+    "build": "",
     "lint": "",
     "test": "TEST_MODE=1 node demo/demo.js",
     "test:ci": "npm run test"
