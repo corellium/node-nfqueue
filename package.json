@@ -1,15 +1,23 @@
 {
-  "name": "nfqueue",
-  "version": "0.3.1",
+  "name": "@corellium/nfqueue",
+  "version": "0.4.3",
   "description": "Netfilter nfqueue binding",
   "author": {
     "name": "Anthony Hinsinger",
     "email": "anthony.hinsinger@gmail.com"
   },
+  "files": [
+    "nfqueue.js",
+    "src/node_nfqueue.cpp",
+    "binding.gyp",
+    "prebuilds/**/*.node",
+    "demo/*.js"
+  ],
+  "gypfile": true,
   "scripts": {
-    "clean": "rm -rf build",
-    "install": "node-gyp rebuild",
-    "build": "npm run clean && node-gyp rebuild",
+    "clean": "node-gyp clean",
+    "install": "node-gyp-build",
+    "build": "prebuildify --strip --tag-armv --tag-libc --target 24.0.0 --target 22.0.0 --target 20.0.0",
     "lint": "",
     "test": "TEST_MODE=1 node demo/demo.js",
     "test:ci": "npm run test"
@@ -22,7 +30,7 @@
   "main": "./nfqueue",
   "repository": {
     "type": "git",
-    "url": "git://github.com/atoy40/node-nfqueue.git"
+    "url": "git://github.com/corellium/node-nfqueue.git"
   },
   "keywords": [
     "nfqueue",
@@ -32,7 +40,15 @@
     "iptables"
   ],
   "dependencies": {
+    "@corellium/pcap": "^3.2.0",
     "nan": "^2.22.2",
-    "pcap": "^3.1.0"
+    "node-gyp": "^11.2.0",
+    "node-gyp-build": "^4.8.4"
+  },
+  "devDependencies": {
+    "prebuildify": "^5.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

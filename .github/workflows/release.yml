@@ -1,0 +1,234 @@
+name: Release
+
+on:
+  push:
+
+  pull_request:
+    branches:
+      - master
+
+  release:
+    types: [published]
+
+  workflow_dispatch:
+    inputs:
+      new-version:
+        description: New version to be published, overrides tag
+        required: true
+        type: string
+
+      npm-tag:
+        description: NPM tag
+        required: true
+        default: latest
+        type: choice
+        options:
+          - latest
+          - next
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: linux-x64-glibc
+          - os: ubuntu-22.04-arm
+            arch: linux-arm64-glibc
+          - os: macos-13
+            arch: darwin-x64
+          - os: macos-14
+            arch: darwin-arm64
+
+    name: Build for ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+
+      - name: Install Ubuntu dependencies
+        run: sudo apt-get install -y libpcap-dev libnetfilter-queue-dev
+        if: runner.os == 'Linux'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild
+        run: npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.arch }}
+          path: prebuilds/**/*.node
+
+  build-musl:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: x64
+            platform: linux/amd64
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            platform: linux/arm64
+          - os: ubuntu-22.04-arm
+            arch: armv7
+            platform: linux/arm/v7
+
+    name: Build for linux-${{ matrix.arch }}-musl
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Prebuild
+        uses: addnab/docker-run-action@v3
+        with:
+          image: node:20-alpine
+          options: --platform=${{ matrix.platform }} --volume=${{ github.workspace }}:/repo --workdir=/repo
+          run: |
+            apk add --no-cache g++ make python3 linux-headers libpcap-dev libnetfilter_queue-dev
+            npm ci
+            npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-linux-${{ matrix.arch }}-musl
+          path: prebuilds/**/*.node
+
+  build-freebsd-x64:
+    name: Build for freebsd-x64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Prebuild
+        uses: vmactions/freebsd-vm@v1
+        with:
+          prepare: |
+            pkg install -y gmake python3 npm-node20
+          run: |
+            npm ci
+            npm run build
+          sync: sshfs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-freebsd-x64
+          path: prebuilds/**/*.node
+
+  build-linux-armv7-glibc:
+    name: Build for linux-armv7-glibc
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm/v7
+
+      - name: Prebuild
+        uses: addnab/docker-run-action@v3
+        with:
+          image: node:20-bullseye
+          options: --platform=linux/arm/v7 --volume=${{ github.workspace }}:/repo --workdir=/repo
+          run: |
+            apt update -yq && apt install -yq wget libpcap-dev libnetfilter-queue-dev
+            wget -qL https://deb.nodesource.com/setup_20.x | bash -
+            apt install -yq g++ make python3 nodejs
+            npm ci
+            npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-linux-armv7-glibc
+          path: prebuilds/**/*.node
+
+  publish:
+    name: Publish package
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    needs:
+      - build
+      - build-musl
+      - build-freebsd-x64
+      - build-linux-armv7-glibc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup npm with Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 20
+          token: ${{ secrets.NPM_TOKEN }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download artifacts
+        id: download-artifact
+        uses: actions/download-artifact@v4
+
+      - name: Move prebuild artifacts
+        run: mkdir prebuilds && cp --recursive prebuild-*/* prebuilds/
+
+      - name: Pack package
+        run: npm pack
+        if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+        with:
+          name: package
+          path: '*.tgz'
+
+      - name: Publish to NPM
+        run: |
+          npm version --allow-same-version --no-git-tag-version $VERSION
+          npm publish --provenance --tag $TAG
+        if: ${{ !env.ACT && (github.event_name == 'release' || github.event_name == 'workflow_dispatch') }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TAG: ${{ inputs.npm-tag || 'latest' }}
+          VERSION: ${{ inputs.new-version || github.ref_name }}

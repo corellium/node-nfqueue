@@ -17,7 +17,7 @@
  *
  */
 
-var binding = require('./build/Release/nfqueue');
+const binding = require('node-gyp-build')(__dirname)
 
 /* Constant */
 var i = 0;
